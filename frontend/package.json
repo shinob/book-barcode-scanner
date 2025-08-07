@@ -1,0 +1,44 @@
+{
+  "name": "book-barcode-scanner-frontend",
+  "version": "1.0.0",
+  "description": "Book Barcode Scanner Web Application - Frontend",
+  "main": "index.html",
+  "scripts": {
+    "start": "python3 -m http.server 3000",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "lint": "eslint js/**/*.js",
+    "lint:fix": "eslint js/**/*.js --fix",
+    "format": "prettier --write js/**/*.js css/**/*.css *.html"
+  },
+  "dependencies": {
+    "@zxing/library": "^0.21.3"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "jest-environment-jsdom": "^29.7.0",
+    "@types/jest": "^29.5.12",
+    "eslint": "^9.15.0",
+    "prettier": "^3.1.1",
+    "http-server": "^14.1.1"
+  },
+  "jest": {
+    "testEnvironment": "jsdom",
+    "testMatch": ["**/tests/unit/**/*.test.js"],
+    "collectCoverageFrom": [
+      "js/**/*.js",
+      "!js/**/*.min.js",
+      "!**/node_modules/**"
+    ]
+  },
+  "keywords": [
+    "barcode",
+    "scanner",
+    "books",
+    "isbn",
+    "web-app"
+  ],
+  "author": "",
+  "license": "MIT"
+}

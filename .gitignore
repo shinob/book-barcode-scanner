@@ -136,13 +136,26 @@ celerybeat.pid
 
 # Environments
 .env
+.env.local
+.env.production
 .envrc
 .venv
 env/
 venv/
+backend/venv/
+backend/env/
 ENV/
 env.bak/
 venv.bak/
+
+# Node.js
+frontend/node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Frontend testing
+frontend/coverage/
 
 # Spyder project settings
 .spyderproject
