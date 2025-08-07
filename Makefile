@@ -46,12 +46,12 @@ install-frontend:
 
 install-backend:
 	@echo "Installing backend dependencies..."
-	cd backend && source venv/bin/activate && pip install -r requirements.txt
+	cd backend && bash -c "source venv/bin/activate && pip install -r requirements.txt"
 
 # 開発サーバー起動
 start-backend:
 	@echo "Starting backend server..."
-	cd backend && source venv/bin/activate && python main.py
+	cd backend && bash -c "source venv/bin/activate && python main.py"
 
 start-frontend:
 	@echo "Starting frontend server..."
@@ -67,12 +67,12 @@ test-frontend:
 
 test-backend:
 	@echo "Running backend tests..."
-	cd backend && source venv/bin/activate && pytest tests/ -v
+	cd backend && bash -c "source venv/bin/activate && pytest tests/ -v"
 
 test-coverage:
 	@echo "Generating test coverage reports..."
 	cd frontend && npm run test:coverage
-	cd backend && source venv/bin/activate && pytest tests/ --cov=. --cov-report=html --cov-report=term
+	cd backend && bash -c "source venv/bin/activate && pytest tests/ --cov=. --cov-report=html --cov-report=term"
 
 # コード品質
 lint: lint-frontend lint-backend
@@ -84,8 +84,8 @@ lint-frontend:
 
 lint-backend:
 	@echo "Linting backend code..."
-	cd backend && source venv/bin/activate && flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
-	cd backend && source venv/bin/activate && flake8 . --count --exit-zero --max-complexity=10 --max-line-length=88 --statistics
+	cd backend && bash -c "source venv/bin/activate && flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics"
+	cd backend && bash -c "source venv/bin/activate && flake8 . --count --exit-zero --max-complexity=10 --max-line-length=88 --statistics"
 
 format: format-frontend format-backend
 	@echo "Formatting completed!"
@@ -96,8 +96,8 @@ format-frontend:
 
 format-backend:
 	@echo "Formatting backend code..."
-	cd backend && source venv/bin/activate && black .
-	cd backend && source venv/bin/activate && isort .
+	cd backend && bash -c "source venv/bin/activate && black ."
+	cd backend && bash -c "source venv/bin/activate && isort ."
 
 # ビルドとクリーンアップ
 build:
@@ -165,14 +165,14 @@ reset: clean
 update-deps:
 	@echo "Updating dependencies..."
 	cd frontend && npm update
-	cd backend && source venv/bin/activate && pip install --upgrade -r requirements.txt
+	cd backend && bash -c "source venv/bin/activate && pip install --upgrade -r requirements.txt"
 	@echo "Dependencies updated!"
 
 # セキュリティチェック
 security-check:
 	@echo "Running security checks..."
 	cd frontend && npm audit
-	cd backend && source venv/bin/activate && pip check
+	cd backend && bash -c "source venv/bin/activate && pip check"
 	@echo "Security check completed!"
 
 # 設定確認
