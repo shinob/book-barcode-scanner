@@ -13,9 +13,8 @@ python3 -m venv venv
 source venv/bin/activate
 pip install --upgrade pip
 
-# 必要なPythonパッケージをインストール
-pip install fastapi uvicorn pydantic httpx beautifulsoup4 requests
-pip install pytest pytest-asyncio black isort flake8
+# requirements.txtからパッケージをインストール
+pip install -r requirements.txt
 
 echo "Python backend environment setup complete."
 
@@ -48,5 +47,6 @@ echo "4. Access application: http://127.0.0.1:3000"
 echo ""
 echo "Troubleshooting:"
 echo "- If you see 'source: not found' error, use the latest Makefile"
+echo "- For 'ModuleNotFoundError', run: make install-backend"
 echo "- For camera issues, ensure HTTPS and browser permissions"
 echo "- For port conflicts, modify .env file"

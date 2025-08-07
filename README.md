@@ -263,6 +263,20 @@ Address already in use: 3001
 - 他のプロセスがポートを使用している場合があります
 - `.env`ファイルでポート番号を変更してください
 
+#### 5. モジュールインポートエラー
+```
+ModuleNotFoundError: No module named 'dotenv'
+```
+
+**解決策**: 
+- 仮想環境内で依存関係をインストールしてください：
+```bash
+cd backend
+source venv/bin/activate
+pip install -r requirements.txt
+```
+- または`make install-backend`を実行してください
+
 ## 🤝 貢献
 
 1. Fork the Project

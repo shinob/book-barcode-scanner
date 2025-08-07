@@ -33,6 +33,8 @@ help:
 	@echo "Utility Commands:"
 	@echo "  clean              - 一時ファイルとビルド成果物を削除"
 	@echo "  build              - プロダクションビルド"
+	@echo "  reinstall-deps     - 依存関係を再インストール"
+	@echo "  update-deps        - 依存関係を更新"
 
 # セットアップコマンド
 setup:
@@ -160,6 +162,17 @@ reset: clean
 	rm -f .env 2>/dev/null || true
 	@echo "Environment reset completed!"
 	@echo "Run 'make setup' to reinstall dependencies"
+
+# 依存関係の再インストール
+reinstall-deps: clean-deps install-frontend install-backend
+	@echo "Dependencies reinstalled!"
+
+# 依存関係のクリーンアップ
+clean-deps:
+	@echo "Cleaning dependencies..."
+	rm -rf backend/venv 2>/dev/null || true
+	rm -rf frontend/node_modules 2>/dev/null || true
+	@echo "Dependencies cleaned!"
 
 # 依存関係のアップデート
 update-deps:
