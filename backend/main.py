@@ -241,7 +241,7 @@ if __name__ == "__main__":
     import uvicorn
     
     host = os.getenv('FASTAPI_HOST', '127.0.0.1')
-    port = int(os.getenv('FASTAPI_PORT', 8000))
+    port = int(os.getenv('FASTAPI_PORT', 3001))
     debug = os.getenv('FASTAPI_DEBUG', 'False').lower() == 'true'
     
     uvicorn.run(

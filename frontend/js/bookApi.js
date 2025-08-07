@@ -1,7 +1,7 @@
 export class BookAPI {
     constructor() {
         this.googleBooksBaseURL = 'https://www.googleapis.com/books/v1/volumes';
-        this.backendBaseURL = 'http://127.0.0.1:8000'; // FastAPIサーバーのURL
+        this.backendBaseURL = 'http://127.0.0.1:3001'; // FastAPIサーバーのURL
     }
 
     async getBookInfo(isbn) {
