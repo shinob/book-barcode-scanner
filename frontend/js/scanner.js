@@ -29,7 +29,7 @@ export class BarcodeScanner {
                             const codeReader = new ZXing.BrowserMultiFormatReader();
                             
                             try {
-                                const result = await codeReader.decodeFromImageData(imageData);
+                                const result = await codeReader.decodeFromImageElement(img);
                                 const code = result.getText();
                                 console.log('Barcode detected in image:', code);
                                 
