@@ -18,63 +18,87 @@ export class BarcodeScanner {
             // スキャン開始
             this.isScanning = true;
             
-            // MediaStreamを直接取得してビデオ要素に設定
+            // Safari互換のためのMediaStream取得
             try {
-                // まずカメラのMediaStreamを取得
-                const constraints = {
-                    video: {
-                        width: { ideal: 640 },
-                        height: { ideal: 480 },
-                        facingMode: 'environment' // リアカメラを優先
-                    }
-                };
+                const stream = await this.getMediaStream();
                 
-                this.stream = await navigator.mediaDevices.getUserMedia(constraints);
-                videoElement.srcObject = this.stream;
-                
-                // ビデオが準備完了するのを待つ
-                await new Promise((resolve) => {
-                    videoElement.onloadedmetadata = () => {
-                        videoElement.play();
-                        resolve();
-                    };
-                });
-                
-                // ZXingでスキャン開始
-                this.codeReader.decodeFromVideoDevice(undefined, videoElement, (result, error) => {
-                    this.handleScanResult(result, error);
-                });
-                
-            } catch (mediaError) {
-                console.warn('MediaStreamの直接取得に失敗、ZXingのデバイス管理を使用:', mediaError.message);
-                
-                // フォールバック: ZXingのデバイス管理を使用
-                try {
-                    const videoInputDevices = await this.codeReader.listVideoInputDevices();
+                if (stream) {
+                    this.stream = stream;
+                    videoElement.srcObject = stream;
                     
-                    if (videoInputDevices.length === 0) {
-                        throw new Error('カメラデバイスが見つかりません');
-                    }
-
-                    const selectedDeviceId = videoInputDevices[0].deviceId;
-                    
-                    this.codeReader.decodeFromVideoDevice(selectedDeviceId, videoElement, (result, error) => {
-                        this.handleScanResult(result, error);
+                    // ビデオが準備完了するのを待つ
+                    await new Promise((resolve) => {
+                        videoElement.onloadedmetadata = () => {
+                            videoElement.play();
+                            resolve();
+                        };
                     });
                     
-                } catch (enumerationError) {
-                    console.warn('デバイス列挙にも失敗、デフォルトカメラを使用:', enumerationError.message);
-                    
+                    // ZXingでスキャン開始
                     this.codeReader.decodeFromVideoDevice(undefined, videoElement, (result, error) => {
                         this.handleScanResult(result, error);
                     });
+                } else {
+                    throw new Error('MediaStreamの取得に失敗しました');
                 }
+                
+            } catch (mediaError) {
+                console.warn('MediaStreamの取得に失敗、ZXingの標準方法を使用:', mediaError.message);
+                
+                // フォールバック: ZXingの標準方法を使用
+                this.codeReader.decodeFromVideoDevice(undefined, videoElement, (result, error) => {
+                    this.handleScanResult(result, error);
+                });
             }
 
         } catch (error) {
             this.isScanning = false;
             throw error;
         }
+    }
+
+    async getMediaStream() {
+        // HTTPSチェック（本番環境でのみ）
+        if (location.protocol === 'http:' && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
+            throw new Error('カメラアクセスにはHTTPS接続が必要です');
+        }
+
+        const constraints = {
+            video: {
+                width: { ideal: 640 },
+                height: { ideal: 480 },
+                facingMode: 'environment' // リアカメラを優先
+            }
+        };
+
+        // モダンブラウザ対応
+        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+            try {
+                return await navigator.mediaDevices.getUserMedia(constraints);
+            } catch (error) {
+                console.warn('モダンAPI失敗、フォールバックを試行:', error.message);
+                
+                // facingModeがサポートされていない場合のフォールバック
+                const fallbackConstraints = { video: true };
+                return await navigator.mediaDevices.getUserMedia(fallbackConstraints);
+            }
+        }
+        
+        // Safari/古いブラウザ対応
+        const getUserMedia = navigator.getUserMedia || 
+                           navigator.webkitGetUserMedia || 
+                           navigator.mozGetUserMedia || 
+                           navigator.msGetUserMedia;
+        
+        if (getUserMedia) {
+            return new Promise((resolve, reject) => {
+                // 古いAPIはfacingModeをサポートしていない場合があるので、シンプルなconstraintsを使用
+                const legacyConstraints = { video: true };
+                getUserMedia.call(navigator, legacyConstraints, resolve, reject);
+            });
+        }
+        
+        throw new Error('このブラウザではカメラアクセスがサポートされていません');
     }
     
     handleScanResult(result, error) {
