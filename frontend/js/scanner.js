@@ -32,7 +32,7 @@ export class BarcodeScanner {
                     patchSize: "medium",
                     halfSample: true
                 },
-                numOfWorkers: 2,
+                numOfWorkers: 0,  // WebWorkerを無効化してメインスレッドで処理
                 frequency: 10,
                 decoder: {
                     readers: [
@@ -112,7 +112,7 @@ export class BarcodeScanner {
                                 patchSize: "medium",
                                 halfSample: true
                             },
-                            numOfWorkers: 1,
+                            numOfWorkers: 0,  // WebWorkerを無効化してメインスレッドで処理
                             decoder: {
                                 readers: [
                                     "ean_reader",
