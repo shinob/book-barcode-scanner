@@ -98,12 +98,15 @@ export class BarcodeScanner {
                         canvas.height = img.height;
                         ctx.drawImage(img, 0, 0);
                         
+                        // CanvasをDataURLに変換
+                        const canvasDataURL = canvas.toDataURL('image/png');
+                        
                         // QuaggaJSで画像をスキャン
                         const config = {
                             inputStream: {
                                 name: "Image",
                                 type: "ImageStream",
-                                src: canvas
+                                src: canvasDataURL
                             },
                             locator: {
                                 patchSize: "medium",
