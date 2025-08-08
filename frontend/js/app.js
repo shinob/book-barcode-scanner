@@ -23,6 +23,9 @@ class BookBarcodeApp {
         document.getElementById('startScanBtn').addEventListener('click', () => this.startScanning());
         document.getElementById('stopScanBtn').addEventListener('click', () => this.stopScanning());
         
+        // 画像アップロード
+        document.getElementById('imageUpload').addEventListener('change', (e) => this.handleImageUpload(e));
+        
         // 手動入力
         document.getElementById('manualInputBtn').addEventListener('click', () => this.openManualInput());
         document.getElementById('searchManualBtn').addEventListener('click', () => this.searchManualISBN());
@@ -64,6 +67,38 @@ class BookBarcodeApp {
         document.getElementById('startScanBtn').style.display = 'inline-block';
         document.getElementById('stopScanBtn').style.display = 'none';
         this.showScanResult('スキャンを停止しました。', 'success');
+    }
+
+    async handleImageUpload(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        // ファイルタイプチェック
+        if (!file.type.startsWith('image/')) {
+            this.showScanResult('画像ファイルを選択してください。', 'error');
+            return;
+        }
+
+        this.showScanResult('画像を解析中...', 'success');
+        this.showLoading(true);
+
+        try {
+            const isbn = await this.scanner.scanImageFile(file);
+            
+            if (isbn) {
+                this.showScanResult(`ISBN: ${isbn} が検出されました。書籍情報を取得中...`, 'success');
+                await this.searchBookByISBN(isbn);
+            } else {
+                this.showScanResult('有効なISBNバーコードが見つかりませんでした。', 'error');
+            }
+        } catch (error) {
+            console.error('Image scan error:', error);
+            this.showScanResult(`画像読み取りに失敗しました: ${error.message}`, 'error');
+        } finally {
+            this.showLoading(false);
+            // ファイル入力をリセット
+            event.target.value = '';
+        }
     }
 
     async handleScanSuccess(isbn) {

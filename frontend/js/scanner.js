@@ -81,6 +81,82 @@ export class BarcodeScanner {
         }
     }
 
+    async scanImageFile(file) {
+        try {
+            console.log('Scanning image file:', file.name);
+            
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const canvas = document.getElementById('canvas');
+                    const ctx = canvas.getContext('2d');
+                    const img = new Image();
+                    
+                    img.onload = () => {
+                        // Canvasにサイズを設定
+                        canvas.width = img.width;
+                        canvas.height = img.height;
+                        ctx.drawImage(img, 0, 0);
+                        
+                        // QuaggaJSで画像をスキャン
+                        const config = {
+                            inputStream: {
+                                name: "Image",
+                                type: "ImageStream",
+                                src: canvas
+                            },
+                            locator: {
+                                patchSize: "medium",
+                                halfSample: true
+                            },
+                            numOfWorkers: 1,
+                            decoder: {
+                                readers: [
+                                    "ean_reader",
+                                    "ean_8_reader", 
+                                    "ean_13_reader"
+                                ]
+                            },
+                            locate: true
+                        };
+                        
+                        Quagga.decodeSingle(config, (result) => {
+                            if (result && result.codeResult) {
+                                const code = result.codeResult.code;
+                                console.log('Barcode detected in image:', code);
+                                
+                                const isbn = this.extractISBN(code);
+                                if (isbn) {
+                                    resolve(isbn);
+                                } else {
+                                    reject(new Error('有効なISBNバーコードが見つかりませんでした'));
+                                }
+                            } else {
+                                reject(new Error('画像からバーコードを読み取れませんでした'));
+                            }
+                        });
+                    };
+                    
+                    img.onerror = () => {
+                        reject(new Error('画像の読み込みに失敗しました'));
+                    };
+                    
+                    img.src = e.target.result;
+                };
+                
+                reader.onerror = () => {
+                    reject(new Error('ファイルの読み込みに失敗しました'));
+                };
+                
+                reader.readAsDataURL(file);
+            });
+            
+        } catch (error) {
+            console.error('Image scan failed:', error);
+            throw error;
+        }
+    }
+
     stopScanning() {
         this.isScanning = false;
         
