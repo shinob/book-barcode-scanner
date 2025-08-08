@@ -37,10 +37,6 @@
     ],
     "transform": {
       "^.+\\.js$": "babel-jest"
-    },
-    "extensionsToTreatAsEsm": [".js"],
-    "globals": {
-      "NODE_OPTIONS": "--experimental-vm-modules"
     }
   },
   "keywords": [
