@@ -29,6 +29,19 @@
                 </div>
                 <div id="scanResult" class="scan-result"></div>
                 
+                <!-- バーコード検出結果表示 -->
+                <div id="barcodeDetection" class="barcode-detection" style="display: none;">
+                    <h3>検出されたバーコード</h3>
+                    <div id="detectedBarcode" class="detected-barcode">
+                        <canvas id="barcodeCanvas" style="max-width: 100%; border: 2px solid #007bff;"></canvas>
+                        <div class="barcode-info">
+                            <p><strong>検出コード:</strong> <span id="detectedCode"></span></p>
+                            <p><strong>ISBN:</strong> <span id="detectedISBN"></span></p>
+                            <p><strong>信頼度:</strong> <span id="confidence"></span></p>
+                        </div>
+                    </div>
+                </div>
+                
                 <!-- 手動入力モーダル -->
                 <div id="manualModal" class="modal">
                     <div class="modal-content">

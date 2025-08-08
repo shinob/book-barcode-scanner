@@ -79,6 +79,9 @@ class BookBarcodeApp {
             return;
         }
 
+        // 前回の検出結果をクリア
+        this.scanner.hideDetectedBarcode();
+
         this.showScanResult('画像を解析中...', 'success');
         this.showLoading(true);
 

@@ -128,6 +128,9 @@ export class BarcodeScanner {
                                 const code = result.codeResult.code;
                                 console.log('Barcode detected in image:', code);
                                 
+                                // バーコード領域を切り出して表示
+                                this.displayDetectedBarcode(result, canvas);
+                                
                                 const isbn = this.extractISBN(code);
                                 if (isbn) {
                                     resolve(isbn);
@@ -158,6 +161,77 @@ export class BarcodeScanner {
             console.error('Image scan failed:', error);
             throw error;
         }
+    }
+
+    displayDetectedBarcode(result, sourceCanvas) {
+        try {
+            const codeResult = result.codeResult;
+            const box = result.box || [];
+            
+            if (box.length < 4) {
+                console.warn('バーコード領域の座標が不完全です');
+                return;
+            }
+
+            // バーコード領域の境界を計算
+            const minX = Math.min(...box.map(p => p[0]));
+            const maxX = Math.max(...box.map(p => p[0]));
+            const minY = Math.min(...box.map(p => p[1]));
+            const maxY = Math.max(...box.map(p => p[1]));
+            
+            const width = maxX - minX;
+            const height = maxY - minY;
+            
+            // マージンを追加
+            const margin = 20;
+            const cropX = Math.max(0, minX - margin);
+            const cropY = Math.max(0, minY - margin);
+            const cropWidth = Math.min(sourceCanvas.width - cropX, width + margin * 2);
+            const cropHeight = Math.min(sourceCanvas.height - cropY, height + margin * 2);
+
+            // バーコード表示用キャンバスを取得
+            const barcodeCanvas = document.getElementById('barcodeCanvas');
+            const ctx = barcodeCanvas.getContext('2d');
+            
+            // キャンバスサイズを設定
+            barcodeCanvas.width = cropWidth;
+            barcodeCanvas.height = cropHeight;
+            
+            // バーコード領域を切り出し
+            ctx.drawImage(sourceCanvas, 
+                cropX, cropY, cropWidth, cropHeight,  // source
+                0, 0, cropWidth, cropHeight           // destination
+            );
+            
+            // 検出枠を描画
+            ctx.strokeStyle = '#00ff00';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(minX - cropX, minY - cropY, width, height);
+            
+            // 情報を表示
+            document.getElementById('detectedCode').textContent = codeResult.code;
+            document.getElementById('detectedISBN').textContent = this.extractISBN(codeResult.code) || 'なし';
+            document.getElementById('confidence').textContent = 
+                codeResult.decodedCodes ? 
+                `${Math.round(codeResult.decodedCodes.reduce((sum, code) => sum + (code.error || 0), 0) / codeResult.decodedCodes.length * 100)}%` : 
+                '不明';
+            
+            // 検出結果エリアを表示
+            document.getElementById('barcodeDetection').style.display = 'block';
+            
+            console.log('バーコード領域を表示しました:', {
+                code: codeResult.code,
+                box: box,
+                crop: { x: cropX, y: cropY, width: cropWidth, height: cropHeight }
+            });
+            
+        } catch (error) {
+            console.warn('バーコード領域の表示に失敗:', error);
+        }
+    }
+
+    hideDetectedBarcode() {
+        document.getElementById('barcodeDetection').style.display = 'none';
     }
 
     stopScanning() {
