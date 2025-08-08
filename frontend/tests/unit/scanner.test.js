@@ -164,7 +164,8 @@ describe('BarcodeScanner', () => {
                 listVideoInputDevices: jest.fn().mockResolvedValue([
                     { deviceId: 'device1', label: 'Camera 1' }
                 ]),
-                decodeFromVideoDevice: jest.fn()
+                decodeFromVideoDevice: jest.fn(),
+                reset: jest.fn()
             };
             
             mockZXing.BrowserMultiFormatReader.mockReturnValue(mockCodeReader);
@@ -186,7 +187,8 @@ describe('BarcodeScanner', () => {
 
         test('カメラデバイスが見つからない場合エラーをthrowする', async () => {
             const mockCodeReader = {
-                listVideoInputDevices: jest.fn().mockResolvedValue([])
+                listVideoInputDevices: jest.fn().mockResolvedValue([]),
+                reset: jest.fn()
             };
             
             mockZXing.BrowserMultiFormatReader.mockReturnValue(mockCodeReader);
@@ -235,7 +237,8 @@ describe('BarcodeScanner', () => {
                         getText: () => '9784123456789'
                     };
                     callback(mockResult, null);
-                })
+                }),
+                reset: jest.fn()
             };
 
             mockZXing.BrowserMultiFormatReader.mockReturnValue(mockCodeReader);
@@ -259,7 +262,8 @@ describe('BarcodeScanner', () => {
                     const error = new Error('Camera error');
                     error.name = 'CameraError';
                     callback(null, error);
-                })
+                }),
+                reset: jest.fn()
             };
 
             mockZXing.BrowserMultiFormatReader.mockReturnValue(mockCodeReader);
@@ -283,7 +287,8 @@ describe('BarcodeScanner', () => {
                     const error = new Error('Not found');
                     error.name = 'NotFoundException';
                     callback(null, error);
-                })
+                }),
+                reset: jest.fn()
             };
 
             mockZXing.BrowserMultiFormatReader.mockReturnValue(mockCodeReader);

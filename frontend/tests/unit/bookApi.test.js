@@ -18,7 +18,7 @@ describe('BookAPI', () => {
     describe('初期化', () => {
         test('インスタンスが正しく初期化される', () => {
             expect(bookAPI.googleBooksBaseURL).toBe('https://www.googleapis.com/books/v1/volumes');
-            expect(bookAPI.backendBaseURL).toBe('http://127.0.0.1:8000');
+            expect(bookAPI.backendBaseURL).toBe('http://127.0.0.1:3001');
         });
     });
 
@@ -100,7 +100,7 @@ describe('BookAPI', () => {
             const result = await bookAPI.getAmazonPrice('9784123456789');
 
             expect(result).toBe(800);
-            expect(fetch).toHaveBeenCalledWith('http://127.0.0.1:8000/api/amazon-price/9784123456789');
+            expect(fetch).toHaveBeenCalledWith('http://127.0.0.1:3001/api/amazon-price/9784123456789');
         });
 
         test('価格が見つからない場合nullを返す', async () => {
