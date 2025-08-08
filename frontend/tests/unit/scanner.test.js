@@ -31,6 +31,9 @@ describe('BarcodeScanner', () => {
     beforeEach(() => {
         scanner = new BarcodeScanner();
         jest.clearAllMocks();
+        
+        // navigatorのベースセットアップ
+        global.navigator = global.navigator || {};
     });
 
     afterEach(() => {
@@ -159,41 +162,110 @@ describe('BarcodeScanner', () => {
     });
 
     describe('スキャン制御', () => {
-        test('スキャン開始時にカメラデバイス一覧を取得する', async () => {
+        test('getUserMediaが利用可能な場合、MediaStreamを直接取得する', async () => {
+            // getUserMediaのモック
+            const mockStream = { getTracks: jest.fn(() => []) };
+            global.navigator.mediaDevices = {
+                getUserMedia: jest.fn().mockResolvedValue(mockStream)
+            };
+
             const mockCodeReader = {
-                listVideoInputDevices: jest.fn().mockResolvedValue([
-                    { deviceId: 'device1', label: 'Camera 1' }
-                ]),
                 decodeFromVideoDevice: jest.fn(),
                 reset: jest.fn()
             };
             
             mockZXing.BrowserMultiFormatReader.mockReturnValue(mockCodeReader);
             
-            document.getElementById.mockReturnValue({
-                srcObject: null
-            });
+            const mockVideoElement = {
+                srcObject: null,
+                onloadedmetadata: null,
+                play: jest.fn()
+            };
+            document.getElementById.mockReturnValue(mockVideoElement);
 
-            await scanner.startScanning();
+            // startScanningを非同期で開始し、onloadedmetadataを手動で発火
+            const scanPromise = scanner.startScanning();
+            
+            // onloadedmetadataコールバックを実行
+            if (mockVideoElement.onloadedmetadata) {
+                mockVideoElement.onloadedmetadata();
+            }
+            
+            await scanPromise;
 
-            expect(mockCodeReader.listVideoInputDevices).toHaveBeenCalled();
+            expect(global.navigator.mediaDevices.getUserMedia).toHaveBeenCalled();
+            expect(mockVideoElement.srcObject).toBe(mockStream);
             expect(mockCodeReader.decodeFromVideoDevice).toHaveBeenCalledWith(
-                'device1',
-                expect.anything(),
+                undefined,
+                mockVideoElement,
                 expect.any(Function)
             );
             expect(scanner.isScanning).toBe(true);
         });
 
-        test('カメラデバイスが見つからない場合エラーをthrowする', async () => {
+        test('getUserMediaが失敗した場合、ZXingの標準方法を使用する', async () => {
+            // getUserMediaが失敗するようにモック
+            global.navigator.mediaDevices = {
+                getUserMedia: jest.fn().mockRejectedValue(new Error('Camera not available'))
+            };
+
             const mockCodeReader = {
-                listVideoInputDevices: jest.fn().mockResolvedValue([]),
+                decodeFromVideoDevice: jest.fn(),
                 reset: jest.fn()
             };
             
             mockZXing.BrowserMultiFormatReader.mockReturnValue(mockCodeReader);
+            
+            const mockVideoElement = { srcObject: null };
+            document.getElementById.mockReturnValue(mockVideoElement);
 
-            await expect(scanner.startScanning()).rejects.toThrow('カメラデバイスが見つかりません');
+            await scanner.startScanning();
+
+            expect(mockCodeReader.decodeFromVideoDevice).toHaveBeenCalledWith(
+                undefined,
+                mockVideoElement,
+                expect.any(Function)
+            );
+            expect(scanner.isScanning).toBe(true);
+        });
+
+        test('mediaDevicesが未対応の場合、古いAPIを使用する', async () => {
+            // mediaDevicesを未定義に設定
+            delete global.navigator.mediaDevices;
+            
+            // 古いAPIをモック
+            const mockStream = { getTracks: jest.fn(() => []) };
+            global.navigator.webkitGetUserMedia = jest.fn((constraints, success, error) => {
+                success(mockStream);
+            });
+
+            const mockCodeReader = {
+                decodeFromVideoDevice: jest.fn(),
+                reset: jest.fn()
+            };
+            
+            mockZXing.BrowserMultiFormatReader.mockReturnValue(mockCodeReader);
+            
+            const mockVideoElement = {
+                srcObject: null,
+                onloadedmetadata: null,
+                play: jest.fn()
+            };
+            document.getElementById.mockReturnValue(mockVideoElement);
+
+            // startScanningを非同期で開始し、onloadedmetadataを手動で発火
+            const scanPromise = scanner.startScanning();
+            
+            // onloadedmetadataコールバックを実行
+            if (mockVideoElement.onloadedmetadata) {
+                mockVideoElement.onloadedmetadata();
+            }
+            
+            await scanPromise;
+
+            expect(global.navigator.webkitGetUserMedia).toHaveBeenCalled();
+            expect(mockVideoElement.srcObject).toBe(mockStream);
+            expect(scanner.isScanning).toBe(true);
         });
 
         test('スキャン停止時に適切にクリーンアップされる', () => {
@@ -201,15 +273,18 @@ describe('BarcodeScanner', () => {
                 reset: jest.fn()
             };
             
+            const mockStream = {
+                getTracks: jest.fn(() => [
+                    { stop: jest.fn() }
+                ])
+            };
+            
             scanner.codeReader = mockCodeReader;
+            scanner.stream = mockStream;
             scanner.isScanning = true;
 
             const mockVideoElement = {
-                srcObject: {
-                    getTracks: jest.fn(() => [
-                        { stop: jest.fn() }
-                    ])
-                }
+                srcObject: mockStream
             };
             
             document.getElementById.mockReturnValue(mockVideoElement);
@@ -219,18 +294,23 @@ describe('BarcodeScanner', () => {
             expect(scanner.isScanning).toBe(false);
             expect(mockCodeReader.reset).toHaveBeenCalled();
             expect(scanner.codeReader).toBeNull();
+            expect(scanner.stream).toBeNull();
+            expect(mockVideoElement.srcObject).toBeNull();
         });
     });
 
     describe('コールバック処理', () => {
+        beforeEach(() => {
+            // MediaDevicesをフォールバック状態に設定（カメラなし）
+            delete global.navigator.mediaDevices;
+            delete global.navigator.webkitGetUserMedia;
+        });
+
         test('スキャン成功時にコールバックが呼ばれる', async () => {
             const mockSuccessCallback = jest.fn();
             scanner.onScanSuccess = mockSuccessCallback;
 
             const mockCodeReader = {
-                listVideoInputDevices: jest.fn().mockResolvedValue([
-                    { deviceId: 'device1' }
-                ]),
                 decodeFromVideoDevice: jest.fn((deviceId, element, callback) => {
                     // スキャン成功をシミュレート
                     const mockResult = {
@@ -254,9 +334,6 @@ describe('BarcodeScanner', () => {
             scanner.onScanError = mockErrorCallback;
 
             const mockCodeReader = {
-                listVideoInputDevices: jest.fn().mockResolvedValue([
-                    { deviceId: 'device1' }
-                ]),
                 decodeFromVideoDevice: jest.fn((deviceId, element, callback) => {
                     // NotFoundExceptionではないエラーをシミュレート
                     const error = new Error('Camera error');
@@ -279,9 +356,6 @@ describe('BarcodeScanner', () => {
             scanner.onScanError = mockErrorCallback;
 
             const mockCodeReader = {
-                listVideoInputDevices: jest.fn().mockResolvedValue([
-                    { deviceId: 'device1' }
-                ]),
                 decodeFromVideoDevice: jest.fn((deviceId, element, callback) => {
                     // NotFoundExceptionをシミュレート（正常な動作）
                     const error = new Error('Not found');
