@@ -58,8 +58,14 @@ export class BarcodeScanner {
     }
 
     async getMediaStream() {
-        // HTTPSチェック（本番環境でのみ）
-        if (location.protocol === 'http:' && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
+        // HTTPSチェック（開発環境を除く）
+        const isDevelopment = location.hostname === 'localhost' || 
+                            location.hostname === '127.0.0.1' ||
+                            location.hostname.startsWith('192.168.') ||
+                            location.hostname.endsWith('.local') ||
+                            location.hostname === '0.0.0.0';
+                            
+        if (location.protocol === 'http:' && !isDevelopment) {
             throw new Error('カメラアクセスにはHTTPS接続が必要です');
         }
 
