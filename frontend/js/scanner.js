@@ -1,8 +1,7 @@
 export class BarcodeScanner {
     constructor() {
-        this.codeReader = null;
-        this.stream = null;
         this.isScanning = false;
+        this.stream = null;
         
         this.onScanSuccess = null;
         this.onScanError = null;
@@ -10,160 +9,90 @@ export class BarcodeScanner {
 
     async startScanning() {
         try {
-            // ZXing-jsのBrowserMultiFormatReaderを初期化
-            this.codeReader = new ZXing.BrowserMultiFormatReader();
-            
-            const videoElement = document.getElementById('video');
+            console.log('Starting QuaggaJS barcode scanner...');
             
             // スキャン開始
             this.isScanning = true;
             
-            // Safari互換のためのMediaStream取得
-            try {
-                const stream = await this.getMediaStream();
-                
-                if (stream) {
-                    this.stream = stream;
-                    videoElement.srcObject = stream;
-                    
-                    // ビデオが準備完了するのを待つ
-                    await new Promise((resolve) => {
-                        videoElement.onloadedmetadata = () => {
-                            videoElement.play();
-                            resolve();
-                        };
-                    });
-                    
-                    // ZXingでスキャン開始
-                    this.codeReader.decodeFromVideoDevice(undefined, videoElement, (result, error) => {
-                        this.handleScanResult(result, error);
-                    });
-                } else {
-                    throw new Error('MediaStreamの取得に失敗しました');
-                }
-                
-            } catch (mediaError) {
-                console.warn('MediaStreamの取得に失敗、ZXingの標準方法を使用:', mediaError.message);
-                
-                // フォールバック: ZXingの標準方法を使用
-                this.codeReader.decodeFromVideoDevice(undefined, videoElement, (result, error) => {
-                    this.handleScanResult(result, error);
+            const videoElement = document.getElementById('video');
+            
+            // QuaggaJSの設定
+            const config = {
+                inputStream: {
+                    name: "Live",
+                    type: "LiveStream",
+                    target: videoElement,
+                    constraints: {
+                        width: 640,
+                        height: 480,
+                        facingMode: "environment"
+                    }
+                },
+                locator: {
+                    patchSize: "medium",
+                    halfSample: true
+                },
+                numOfWorkers: 2,
+                frequency: 10,
+                decoder: {
+                    readers: [
+                        "ean_reader",
+                        "ean_8_reader",
+                        "ean_13_reader"
+                    ]
+                },
+                locate: true
+            };
+
+            // QuaggaJSを初期化
+            await new Promise((resolve, reject) => {
+                Quagga.init(config, (err) => {
+                    if (err) {
+                        console.error('QuaggaJS initialization failed:', err);
+                        reject(err);
+                    } else {
+                        console.log('QuaggaJS initialization successful');
+                        resolve();
+                    }
                 });
-            }
+            });
+
+            // スキャン結果のイベントリスナー
+            Quagga.onDetected((result) => {
+                if (this.isScanning && result.codeResult) {
+                    const code = result.codeResult.code;
+                    console.log('Barcode detected:', code);
+                    
+                    const isbn = this.extractISBN(code);
+                    if (isbn && this.onScanSuccess) {
+                        this.onScanSuccess(isbn);
+                    }
+                }
+            });
+
+            // スキャン開始
+            Quagga.start();
+            console.log('QuaggaJS scanning started');
 
         } catch (error) {
             this.isScanning = false;
+            console.error('Scanner start failed:', error);
             throw error;
-        }
-    }
-
-    async getMediaStream() {
-        console.log('Camera access attempt:', {
-            protocol: location.protocol,
-            hostname: location.hostname,
-            hasMediaDevices: !!navigator.mediaDevices,
-            hasGetUserMedia: !!navigator.mediaDevices?.getUserMedia,
-            hasLegacyAPI: !!(navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia || navigator.msGetUserMedia)
-        });
-
-        // HTTPSチェック（開発環境を除く）
-        const isDevelopment = location.hostname === 'localhost' || 
-                            location.hostname === '127.0.0.1' ||
-                            location.hostname.startsWith('192.168.') ||
-                            location.hostname.endsWith('.local') ||
-                            location.hostname === '0.0.0.0';
-                            
-        if (location.protocol === 'http:' && !isDevelopment) {
-            throw new Error('カメラアクセスにはHTTPS接続が必要です');
-        }
-
-        const constraints = {
-            video: {
-                width: { ideal: 640 },
-                height: { ideal: 480 },
-                facingMode: 'environment' // リアカメラを優先
-            }
-        };
-
-        // モダンブラウザ対応
-        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-            try {
-                console.log('Trying modern getUserMedia with constraints:', constraints);
-                const stream = await navigator.mediaDevices.getUserMedia(constraints);
-                console.log('Modern getUserMedia succeeded');
-                return stream;
-            } catch (error) {
-                console.warn('モダンAPI失敗、シンプルな制約で再試行:', error.message, error.name);
-                
-                try {
-                    // facingModeがサポートされていない場合のフォールバック
-                    const fallbackConstraints = { video: true };
-                    console.log('Trying fallback constraints:', fallbackConstraints);
-                    const stream = await navigator.mediaDevices.getUserMedia(fallbackConstraints);
-                    console.log('Fallback getUserMedia succeeded');
-                    return stream;
-                } catch (fallbackError) {
-                    console.warn('フォールバック制約も失敗:', fallbackError.message, fallbackError.name);
-                    throw fallbackError;
-                }
-            }
-        }
-        
-        // Safari/古いブラウザ対応
-        const getUserMedia = navigator.getUserMedia || 
-                           navigator.webkitGetUserMedia || 
-                           navigator.mozGetUserMedia || 
-                           navigator.msGetUserMedia;
-        
-        if (getUserMedia) {
-            console.log('Trying legacy getUserMedia API');
-            return new Promise((resolve, reject) => {
-                // 古いAPIはfacingModeをサポートしていない場合があるので、シンプルなconstraintsを使用
-                const legacyConstraints = { video: true };
-                getUserMedia.call(navigator, legacyConstraints, (stream) => {
-                    console.log('Legacy getUserMedia succeeded');
-                    resolve(stream);
-                }, (error) => {
-                    console.warn('Legacy getUserMedia failed:', error.message || error);
-                    reject(error);
-                });
-            });
-        }
-        
-        console.error('No camera API available');
-        throw new Error('このブラウザではカメラアクセスがサポートされていません');
-    }
-    
-    handleScanResult(result, error) {
-        if (result && this.isScanning) {
-            const isbn = this.extractISBN(result.getText());
-            if (isbn && this.onScanSuccess) {
-                this.onScanSuccess(isbn);
-            }
-        }
-        
-        if (error && this.onScanError) {
-            // ZXingのNotFoundExceptionは正常な動作（バーコードが見つからない）
-            if (!error.name || error.name !== 'NotFoundException') {
-                this.onScanError(error);
-            }
         }
     }
 
     stopScanning() {
         this.isScanning = false;
         
-        if (this.codeReader) {
-            this.codeReader.reset();
-            this.codeReader = null;
+        try {
+            // QuaggaJSを停止
+            Quagga.stop();
+            console.log('QuaggaJS scanning stopped');
+        } catch (error) {
+            console.warn('Error stopping scanner:', error);
         }
 
-        // ビデオストリームを停止
-        if (this.stream) {
-            this.stream.getTracks().forEach(track => track.stop());
-            this.stream = null;
-        }
-        
+        // ビデオストリームをクリーンアップ
         const videoElement = document.getElementById('video');
         if (videoElement.srcObject) {
             videoElement.srcObject = null;

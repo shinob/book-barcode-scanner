@@ -2,17 +2,19 @@
  * @jest-environment jsdom
  */
 
-// ZXingライブラリのモック
-const mockZXing = {
-    BrowserMultiFormatReader: jest.fn(() => ({
-        listVideoInputDevices: jest.fn(),
-        decodeFromVideoDevice: jest.fn(),
-        reset: jest.fn()
-    }))
+// QuaggaJSライブラリのモック
+const mockQuagga = {
+    init: jest.fn((config, callback) => {
+        setTimeout(() => callback(null), 0);
+    }),
+    start: jest.fn(),
+    stop: jest.fn(),
+    onDetected: jest.fn(),
+    offDetected: jest.fn()
 };
 
-// グローバルにZXingを設定
-global.ZXing = mockZXing;
+// グローバルにQuaggaを設定
+global.Quagga = mockQuagga;
 
 // DOMのモック
 Object.defineProperty(document, 'getElementById', {
@@ -44,7 +46,6 @@ describe('BarcodeScanner', () => {
 
     describe('初期化', () => {
         test('インスタンスが正しく初期化される', () => {
-            expect(scanner.codeReader).toBeNull();
             expect(scanner.stream).toBeNull();
             expect(scanner.isScanning).toBe(false);
             expect(scanner.onScanSuccess).toBeNull();
@@ -162,215 +163,66 @@ describe('BarcodeScanner', () => {
     });
 
     describe('スキャン制御', () => {
-        test('getUserMediaが利用可能な場合、MediaStreamを直接取得する', async () => {
-            // getUserMediaのモック
-            const mockStream = { getTracks: jest.fn(() => []) };
-            global.navigator.mediaDevices = {
-                getUserMedia: jest.fn().mockResolvedValue(mockStream)
-            };
-
-            const mockCodeReader = {
-                decodeFromVideoDevice: jest.fn(),
-                reset: jest.fn()
-            };
-            
-            mockZXing.BrowserMultiFormatReader.mockReturnValue(mockCodeReader);
-            
-            const mockVideoElement = {
-                srcObject: null,
-                onloadedmetadata: null,
-                play: jest.fn()
-            };
-            document.getElementById.mockReturnValue(mockVideoElement);
-
-            // startScanningを非同期で開始し、onloadedmetadataを手動で発火
-            const scanPromise = scanner.startScanning();
-            
-            // onloadedmetadataコールバックを実行
-            if (mockVideoElement.onloadedmetadata) {
-                mockVideoElement.onloadedmetadata();
-            }
-            
-            await scanPromise;
-
-            expect(global.navigator.mediaDevices.getUserMedia).toHaveBeenCalled();
-            expect(mockVideoElement.srcObject).toBe(mockStream);
-            expect(mockCodeReader.decodeFromVideoDevice).toHaveBeenCalledWith(
-                undefined,
-                mockVideoElement,
-                expect.any(Function)
-            );
-            expect(scanner.isScanning).toBe(true);
-        });
-
-        test('getUserMediaが失敗した場合、ZXingの標準方法を使用する', async () => {
-            // getUserMediaが失敗するようにモック
-            global.navigator.mediaDevices = {
-                getUserMedia: jest.fn().mockRejectedValue(new Error('Camera not available'))
-            };
-
-            const mockCodeReader = {
-                decodeFromVideoDevice: jest.fn(),
-                reset: jest.fn()
-            };
-            
-            mockZXing.BrowserMultiFormatReader.mockReturnValue(mockCodeReader);
-            
+        test('QuaggaJSでスキャンを開始できる', async () => {
             const mockVideoElement = { srcObject: null };
             document.getElementById.mockReturnValue(mockVideoElement);
 
             await scanner.startScanning();
 
-            expect(mockCodeReader.decodeFromVideoDevice).toHaveBeenCalledWith(
-                undefined,
-                mockVideoElement,
+            expect(mockQuagga.init).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    inputStream: expect.objectContaining({
+                        target: mockVideoElement
+                    }),
+                    decoder: expect.objectContaining({
+                        readers: expect.arrayContaining(['ean_13_reader'])
+                    })
+                }),
                 expect.any(Function)
             );
-            expect(scanner.isScanning).toBe(true);
-        });
-
-        test('mediaDevicesが未対応の場合、古いAPIを使用する', async () => {
-            // mediaDevicesを未定義に設定
-            delete global.navigator.mediaDevices;
-            
-            // 古いAPIをモック
-            const mockStream = { getTracks: jest.fn(() => []) };
-            global.navigator.webkitGetUserMedia = jest.fn((constraints, success, error) => {
-                success(mockStream);
-            });
-
-            const mockCodeReader = {
-                decodeFromVideoDevice: jest.fn(),
-                reset: jest.fn()
-            };
-            
-            mockZXing.BrowserMultiFormatReader.mockReturnValue(mockCodeReader);
-            
-            const mockVideoElement = {
-                srcObject: null,
-                onloadedmetadata: null,
-                play: jest.fn()
-            };
-            document.getElementById.mockReturnValue(mockVideoElement);
-
-            // startScanningを非同期で開始し、onloadedmetadataを手動で発火
-            const scanPromise = scanner.startScanning();
-            
-            // onloadedmetadataコールバックを実行
-            if (mockVideoElement.onloadedmetadata) {
-                mockVideoElement.onloadedmetadata();
-            }
-            
-            await scanPromise;
-
-            expect(global.navigator.webkitGetUserMedia).toHaveBeenCalled();
-            expect(mockVideoElement.srcObject).toBe(mockStream);
+            expect(mockQuagga.start).toHaveBeenCalled();
+            expect(mockQuagga.onDetected).toHaveBeenCalled();
             expect(scanner.isScanning).toBe(true);
         });
 
         test('スキャン停止時に適切にクリーンアップされる', () => {
-            const mockCodeReader = {
-                reset: jest.fn()
-            };
-            
-            const mockStream = {
-                getTracks: jest.fn(() => [
-                    { stop: jest.fn() }
-                ])
-            };
-            
-            scanner.codeReader = mockCodeReader;
-            scanner.stream = mockStream;
             scanner.isScanning = true;
-
-            const mockVideoElement = {
-                srcObject: mockStream
-            };
-            
+            const mockVideoElement = { srcObject: 'mock-stream' };
             document.getElementById.mockReturnValue(mockVideoElement);
 
             scanner.stopScanning();
 
             expect(scanner.isScanning).toBe(false);
-            expect(mockCodeReader.reset).toHaveBeenCalled();
-            expect(scanner.codeReader).toBeNull();
-            expect(scanner.stream).toBeNull();
+            expect(mockQuagga.stop).toHaveBeenCalled();
             expect(mockVideoElement.srcObject).toBeNull();
         });
     });
 
     describe('コールバック処理', () => {
-        beforeEach(() => {
-            // MediaDevicesをフォールバック状態に設定（カメラなし）
-            delete global.navigator.mediaDevices;
-            delete global.navigator.webkitGetUserMedia;
-        });
-
-        test('スキャン成功時にコールバックが呼ばれる', async () => {
+        test('スキャン成功時にコールバックが呼ばれる', () => {
             const mockSuccessCallback = jest.fn();
             scanner.onScanSuccess = mockSuccessCallback;
+            scanner.isScanning = true;
 
-            const mockCodeReader = {
-                decodeFromVideoDevice: jest.fn((deviceId, element, callback) => {
-                    // スキャン成功をシミュレート
-                    const mockResult = {
-                        getText: () => '9784123456789'
-                    };
-                    callback(mockResult, null);
-                }),
-                reset: jest.fn()
-            };
+            // QuaggaJSのonDetectedコールバックをテスト用に取得
+            let detectedCallback;
+            mockQuagga.onDetected.mockImplementation((callback) => {
+                detectedCallback = callback;
+            });
 
-            mockZXing.BrowserMultiFormatReader.mockReturnValue(mockCodeReader);
+            // スキャナーの初期設定（実際のstartScanningを呼ばずに）
             document.getElementById.mockReturnValue({ srcObject: null });
 
-            await scanner.startScanning();
+            // onDetectedコールバックをシミュレート
+            if (detectedCallback) {
+                detectedCallback({
+                    codeResult: {
+                        code: '9784123456789'
+                    }
+                });
+            }
 
             expect(mockSuccessCallback).toHaveBeenCalledWith('9784123456789');
-        });
-
-        test('スキャンエラー時にコールバックが呼ばれる', async () => {
-            const mockErrorCallback = jest.fn();
-            scanner.onScanError = mockErrorCallback;
-
-            const mockCodeReader = {
-                decodeFromVideoDevice: jest.fn((deviceId, element, callback) => {
-                    // NotFoundExceptionではないエラーをシミュレート
-                    const error = new Error('Camera error');
-                    error.name = 'CameraError';
-                    callback(null, error);
-                }),
-                reset: jest.fn()
-            };
-
-            mockZXing.BrowserMultiFormatReader.mockReturnValue(mockCodeReader);
-            document.getElementById.mockReturnValue({ srcObject: null });
-
-            await scanner.startScanning();
-
-            expect(mockErrorCallback).toHaveBeenCalledWith(expect.any(Error));
-        });
-
-        test('NotFoundExceptionはエラーコールバックを呼ばない', async () => {
-            const mockErrorCallback = jest.fn();
-            scanner.onScanError = mockErrorCallback;
-
-            const mockCodeReader = {
-                decodeFromVideoDevice: jest.fn((deviceId, element, callback) => {
-                    // NotFoundExceptionをシミュレート（正常な動作）
-                    const error = new Error('Not found');
-                    error.name = 'NotFoundException';
-                    callback(null, error);
-                }),
-                reset: jest.fn()
-            };
-
-            mockZXing.BrowserMultiFormatReader.mockReturnValue(mockCodeReader);
-            document.getElementById.mockReturnValue({ srcObject: null });
-
-            await scanner.startScanning();
-
-            expect(mockErrorCallback).not.toHaveBeenCalled();
         });
     });
 });
