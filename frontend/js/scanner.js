@@ -15,37 +15,52 @@ export class BarcodeScanner {
             
             const videoElement = document.getElementById('video');
             
-            // デバイスのカメラリストを取得
-            const videoInputDevices = await this.codeReader.listVideoInputDevices();
-            
-            if (videoInputDevices.length === 0) {
-                throw new Error('カメラデバイスが見つかりません');
-            }
-
-            // 利用可能な最初のカメラデバイスを使用
-            const selectedDeviceId = videoInputDevices[0].deviceId;
-            
             // スキャン開始
             this.isScanning = true;
-            this.codeReader.decodeFromVideoDevice(selectedDeviceId, videoElement, (result, error) => {
-                if (result && this.isScanning) {
-                    const isbn = this.extractISBN(result.getText());
-                    if (isbn && this.onScanSuccess) {
-                        this.onScanSuccess(isbn);
-                    }
-                }
+            
+            // デバイス列挙をサポートしていない場合は、デフォルトカメラを使用
+            try {
+                const videoInputDevices = await this.codeReader.listVideoInputDevices();
                 
-                if (error && this.onScanError) {
-                    // ZXingのNotFoundExceptionは正常な動作（バーコードが見つからない）
-                    if (!error.name || error.name !== 'NotFoundException') {
-                        this.onScanError(error);
-                    }
+                if (videoInputDevices.length === 0) {
+                    throw new Error('カメラデバイスが見つかりません');
                 }
-            });
+
+                // 利用可能な最初のカメラデバイスを使用
+                const selectedDeviceId = videoInputDevices[0].deviceId;
+                
+                this.codeReader.decodeFromVideoDevice(selectedDeviceId, videoElement, (result, error) => {
+                    this.handleScanResult(result, error);
+                });
+                
+            } catch (enumerationError) {
+                console.warn('デバイス列挙に失敗、デフォルトカメラを使用:', enumerationError.message);
+                
+                // デバイス列挙が失敗した場合、デフォルトカメラ（undefined）を使用
+                this.codeReader.decodeFromVideoDevice(undefined, videoElement, (result, error) => {
+                    this.handleScanResult(result, error);
+                });
+            }
 
         } catch (error) {
             this.isScanning = false;
             throw error;
+        }
+    }
+    
+    handleScanResult(result, error) {
+        if (result && this.isScanning) {
+            const isbn = this.extractISBN(result.getText());
+            if (isbn && this.onScanSuccess) {
+                this.onScanSuccess(isbn);
+            }
+        }
+        
+        if (error && this.onScanError) {
+            // ZXingのNotFoundExceptionは正常な動作（バーコードが見つからない）
+            if (!error.name || error.name !== 'NotFoundException') {
+                this.onScanError(error);
+            }
         }
     }
 
