@@ -102,45 +102,56 @@ export class BarcodeScanner {
                         const canvasDataURL = canvas.toDataURL('image/png');
                         
                         // QuaggaJSで画像をスキャン
-                        const config = {
-                            inputStream: {
-                                name: "Image",
-                                type: "ImageStream",
-                                src: canvasDataURL
-                            },
-                            locator: {
-                                patchSize: "medium",
-                                halfSample: true
-                            },
-                            numOfWorkers: 0,  // WebWorkerを無効化してメインスレッドで処理
-                            decoder: {
-                                readers: [
-                                    "ean_reader",
-                                    "ean_8_reader", 
-                                    "ean_13_reader"
-                                ]
-                            },
-                            locate: true
-                        };
-                        
-                        Quagga.decodeSingle(config, (result) => {
-                            if (result && result.codeResult) {
-                                const code = result.codeResult.code;
-                                console.log('Barcode detected in image:', code);
-                                
-                                // バーコード領域を切り出して表示
-                                this.displayDetectedBarcode(result, canvas);
-                                
-                                const isbn = this.extractISBN(code);
-                                if (isbn) {
-                                    resolve(isbn);
-                                } else {
-                                    reject(new Error('有効なISBNバーコードが見つかりませんでした'));
+                        try {
+                            const config = {
+                                inputStream: {
+                                    name: "Image",
+                                    type: "ImageStream",
+                                    src: canvasDataURL
+                                },
+                                locator: {
+                                    patchSize: "medium",
+                                    halfSample: true
+                                },
+                                numOfWorkers: 0,  // WebWorkerを無効化してメインスレッドで処理
+                                decoder: {
+                                    readers: [
+                                        "ean_reader",
+                                        "ean_8_reader", 
+                                        "ean_13_reader"
+                                    ]
+                                },
+                                locate: true
+                            };
+                            
+                            Quagga.decodeSingle(config, (result) => {
+                                try {
+                                    if (result && result.codeResult) {
+                                        const code = result.codeResult.code;
+                                        console.log('Barcode detected in image:', code);
+                                        
+                                        // バーコード領域を切り出して表示
+                                        this.displayDetectedBarcode(result, canvas);
+                                        
+                                        const isbn = this.extractISBN(code);
+                                        if (isbn) {
+                                            resolve(isbn);
+                                        } else {
+                                            reject(new Error('有効なISBNバーコードが見つかりませんでした'));
+                                        }
+                                    } else {
+                                        reject(new Error('画像からバーコードを読み取れませんでした'));
+                                    }
+                                } catch (callbackError) {
+                                    console.error('Callback error:', callbackError);
+                                    reject(callbackError);
                                 }
-                            } else {
-                                reject(new Error('画像からバーコードを読み取れませんでした'));
-                            }
-                        });
+                            });
+                            
+                        } catch (configError) {
+                            console.error('QuaggaJS config error:', configError);
+                            reject(configError);
+                        }
                     };
                     
                     img.onerror = () => {
