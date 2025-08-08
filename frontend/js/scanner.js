@@ -18,28 +18,57 @@ export class BarcodeScanner {
             // スキャン開始
             this.isScanning = true;
             
-            // デバイス列挙をサポートしていない場合は、デフォルトカメラを使用
+            // MediaStreamを直接取得してビデオ要素に設定
             try {
-                const videoInputDevices = await this.codeReader.listVideoInputDevices();
+                // まずカメラのMediaStreamを取得
+                const constraints = {
+                    video: {
+                        width: { ideal: 640 },
+                        height: { ideal: 480 },
+                        facingMode: 'environment' // リアカメラを優先
+                    }
+                };
                 
-                if (videoInputDevices.length === 0) {
-                    throw new Error('カメラデバイスが見つかりません');
-                }
-
-                // 利用可能な最初のカメラデバイスを使用
-                const selectedDeviceId = videoInputDevices[0].deviceId;
+                this.stream = await navigator.mediaDevices.getUserMedia(constraints);
+                videoElement.srcObject = this.stream;
                 
-                this.codeReader.decodeFromVideoDevice(selectedDeviceId, videoElement, (result, error) => {
-                    this.handleScanResult(result, error);
+                // ビデオが準備完了するのを待つ
+                await new Promise((resolve) => {
+                    videoElement.onloadedmetadata = () => {
+                        videoElement.play();
+                        resolve();
+                    };
                 });
                 
-            } catch (enumerationError) {
-                console.warn('デバイス列挙に失敗、デフォルトカメラを使用:', enumerationError.message);
-                
-                // デバイス列挙が失敗した場合、デフォルトカメラ（undefined）を使用
+                // ZXingでスキャン開始
                 this.codeReader.decodeFromVideoDevice(undefined, videoElement, (result, error) => {
                     this.handleScanResult(result, error);
                 });
+                
+            } catch (mediaError) {
+                console.warn('MediaStreamの直接取得に失敗、ZXingのデバイス管理を使用:', mediaError.message);
+                
+                // フォールバック: ZXingのデバイス管理を使用
+                try {
+                    const videoInputDevices = await this.codeReader.listVideoInputDevices();
+                    
+                    if (videoInputDevices.length === 0) {
+                        throw new Error('カメラデバイスが見つかりません');
+                    }
+
+                    const selectedDeviceId = videoInputDevices[0].deviceId;
+                    
+                    this.codeReader.decodeFromVideoDevice(selectedDeviceId, videoElement, (result, error) => {
+                        this.handleScanResult(result, error);
+                    });
+                    
+                } catch (enumerationError) {
+                    console.warn('デバイス列挙にも失敗、デフォルトカメラを使用:', enumerationError.message);
+                    
+                    this.codeReader.decodeFromVideoDevice(undefined, videoElement, (result, error) => {
+                        this.handleScanResult(result, error);
+                    });
+                }
             }
 
         } catch (error) {
@@ -73,10 +102,13 @@ export class BarcodeScanner {
         }
 
         // ビデオストリームを停止
+        if (this.stream) {
+            this.stream.getTracks().forEach(track => track.stop());
+            this.stream = null;
+        }
+        
         const videoElement = document.getElementById('video');
         if (videoElement.srcObject) {
-            const stream = videoElement.srcObject;
-            stream.getTracks().forEach(track => track.stop());
             videoElement.srcObject = null;
         }
     }
