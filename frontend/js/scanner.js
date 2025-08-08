@@ -58,6 +58,14 @@ export class BarcodeScanner {
     }
 
     async getMediaStream() {
+        console.log('Camera access attempt:', {
+            protocol: location.protocol,
+            hostname: location.hostname,
+            hasMediaDevices: !!navigator.mediaDevices,
+            hasGetUserMedia: !!navigator.mediaDevices?.getUserMedia,
+            hasLegacyAPI: !!(navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia || navigator.msGetUserMedia)
+        });
+
         // HTTPSチェック（開発環境を除く）
         const isDevelopment = location.hostname === 'localhost' || 
                             location.hostname === '127.0.0.1' ||
@@ -80,13 +88,24 @@ export class BarcodeScanner {
         // モダンブラウザ対応
         if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
             try {
-                return await navigator.mediaDevices.getUserMedia(constraints);
+                console.log('Trying modern getUserMedia with constraints:', constraints);
+                const stream = await navigator.mediaDevices.getUserMedia(constraints);
+                console.log('Modern getUserMedia succeeded');
+                return stream;
             } catch (error) {
-                console.warn('モダンAPI失敗、フォールバックを試行:', error.message);
+                console.warn('モダンAPI失敗、シンプルな制約で再試行:', error.message, error.name);
                 
-                // facingModeがサポートされていない場合のフォールバック
-                const fallbackConstraints = { video: true };
-                return await navigator.mediaDevices.getUserMedia(fallbackConstraints);
+                try {
+                    // facingModeがサポートされていない場合のフォールバック
+                    const fallbackConstraints = { video: true };
+                    console.log('Trying fallback constraints:', fallbackConstraints);
+                    const stream = await navigator.mediaDevices.getUserMedia(fallbackConstraints);
+                    console.log('Fallback getUserMedia succeeded');
+                    return stream;
+                } catch (fallbackError) {
+                    console.warn('フォールバック制約も失敗:', fallbackError.message, fallbackError.name);
+                    throw fallbackError;
+                }
             }
         }
         
@@ -97,13 +116,21 @@ export class BarcodeScanner {
                            navigator.msGetUserMedia;
         
         if (getUserMedia) {
+            console.log('Trying legacy getUserMedia API');
             return new Promise((resolve, reject) => {
                 // 古いAPIはfacingModeをサポートしていない場合があるので、シンプルなconstraintsを使用
                 const legacyConstraints = { video: true };
-                getUserMedia.call(navigator, legacyConstraints, resolve, reject);
+                getUserMedia.call(navigator, legacyConstraints, (stream) => {
+                    console.log('Legacy getUserMedia succeeded');
+                    resolve(stream);
+                }, (error) => {
+                    console.warn('Legacy getUserMedia failed:', error.message || error);
+                    reject(error);
+                });
             });
         }
         
+        console.error('No camera API available');
         throw new Error('このブラウザではカメラアクセスがサポートされていません');
     }
     
