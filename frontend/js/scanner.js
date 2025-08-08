@@ -1,84 +1,7 @@
 export class BarcodeScanner {
     constructor() {
-        this.isScanning = false;
-        this.stream = null;
-        
         this.onScanSuccess = null;
         this.onScanError = null;
-    }
-
-    async startScanning() {
-        try {
-            console.log('Starting QuaggaJS barcode scanner...');
-            
-            // スキャン開始
-            this.isScanning = true;
-            
-            const videoElement = document.getElementById('video');
-            
-            // QuaggaJSの設定
-            const config = {
-                inputStream: {
-                    name: "Live",
-                    type: "LiveStream",
-                    target: videoElement,
-                    constraints: {
-                        width: 640,
-                        height: 480,
-                        facingMode: "environment"
-                    }
-                },
-                locator: {
-                    patchSize: "medium",
-                    halfSample: true
-                },
-                numOfWorkers: 0,  // WebWorkerを無効化してメインスレッドで処理
-                frequency: 10,
-                decoder: {
-                    readers: [
-                        "ean_reader",
-                        "ean_8_reader",
-                        "ean_13_reader"
-                    ]
-                },
-                locate: true
-            };
-
-            // QuaggaJSを初期化
-            await new Promise((resolve, reject) => {
-                Quagga.init(config, (err) => {
-                    if (err) {
-                        console.error('QuaggaJS initialization failed:', err);
-                        reject(err);
-                    } else {
-                        console.log('QuaggaJS initialization successful');
-                        resolve();
-                    }
-                });
-            });
-
-            // スキャン結果のイベントリスナー
-            Quagga.onDetected((result) => {
-                if (this.isScanning && result.codeResult) {
-                    const code = result.codeResult.code;
-                    console.log('Barcode detected:', code);
-                    
-                    const isbn = this.extractISBN(code);
-                    if (isbn && this.onScanSuccess) {
-                        this.onScanSuccess(isbn);
-                    }
-                }
-            });
-
-            // スキャン開始
-            Quagga.start();
-            console.log('QuaggaJS scanning started');
-
-        } catch (error) {
-            this.isScanning = false;
-            console.error('Scanner start failed:', error);
-            throw error;
-        }
     }
 
     async scanImageFile(file) {
@@ -92,65 +15,41 @@ export class BarcodeScanner {
                     const ctx = canvas.getContext('2d');
                     const img = new Image();
                     
-                    img.onload = () => {
-                        // Canvasにサイズを設定
-                        canvas.width = img.width;
-                        canvas.height = img.height;
-                        ctx.drawImage(img, 0, 0);
-                        
-                        // CanvasをDataURLに変換
-                        const canvasDataURL = canvas.toDataURL('image/png');
-                        
-                        // QuaggaJSで画像をスキャン
+                    img.onload = async () => {
                         try {
-                            const config = {
-                                inputStream: {
-                                    name: "Image",
-                                    type: "ImageStream",
-                                    src: canvasDataURL
-                                },
-                                locator: {
-                                    patchSize: "medium",
-                                    halfSample: true
-                                },
-                                numOfWorkers: 0,  // WebWorkerを無効化してメインスレッドで処理
-                                decoder: {
-                                    readers: [
-                                        "ean_reader",
-                                        "ean_8_reader", 
-                                        "ean_13_reader"
-                                    ]
-                                },
-                                locate: true
-                            };
+                            // Canvasにサイズを設定
+                            canvas.width = img.width;
+                            canvas.height = img.height;
+                            ctx.drawImage(img, 0, 0);
                             
-                            Quagga.decodeSingle(config, (result) => {
-                                try {
-                                    if (result && result.codeResult) {
-                                        const code = result.codeResult.code;
-                                        console.log('Barcode detected in image:', code);
-                                        
-                                        // バーコード領域を切り出して表示
-                                        this.displayDetectedBarcode(result, canvas);
-                                        
-                                        const isbn = this.extractISBN(code);
-                                        if (isbn) {
-                                            resolve(isbn);
-                                        } else {
-                                            reject(new Error('有効なISBNバーコードが見つかりませんでした'));
-                                        }
-                                    } else {
-                                        reject(new Error('画像からバーコードを読み取れませんでした'));
-                                    }
-                                } catch (callbackError) {
-                                    console.error('Callback error:', callbackError);
-                                    reject(callbackError);
+                            // ImageDataを取得
+                            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                            
+                            // ZXing-jsで読み取り
+                            const codeReader = new ZXing.BrowserMultiFormatReader();
+                            
+                            try {
+                                const result = await codeReader.decodeFromImageData(imageData);
+                                const code = result.getText();
+                                console.log('Barcode detected in image:', code);
+                                
+                                // バーコード領域を表示
+                                this.displayDetectedBarcode(result, canvas, code);
+                                
+                                const isbn = this.extractISBN(code);
+                                if (isbn) {
+                                    resolve(isbn);
+                                } else {
+                                    reject(new Error('有効なISBNバーコードが見つかりませんでした'));
                                 }
-                            });
+                            } catch (decodeError) {
+                                console.warn('ZXing decode error:', decodeError);
+                                reject(new Error('画像からバーコードを読み取れませんでした'));
+                            }
                             
-                        } catch (configError) {
-                            console.error('QuaggaJS config error:', configError);
-                            reject(configError);
+                        } catch (processError) {
+                            console.error('Image processing error:', processError);
+                            reject(processError);
                         }
                     };
                     
@@ -174,67 +73,73 @@ export class BarcodeScanner {
         }
     }
 
-    displayDetectedBarcode(result, sourceCanvas) {
+    displayDetectedBarcode(result, sourceCanvas, code) {
         try {
-            const codeResult = result.codeResult;
-            const box = result.box || [];
+            // ZXing-jsの結果からバウンディングボックスを取得
+            const resultPoints = result.getResultPoints();
             
-            if (box.length < 4) {
-                console.warn('バーコード領域の座標が不完全です');
-                return;
+            if (resultPoints && resultPoints.length >= 2) {
+                // バーコード領域の境界を計算
+                const xs = resultPoints.map(p => p.getX());
+                const ys = resultPoints.map(p => p.getY());
+                const minX = Math.min(...xs);
+                const maxX = Math.max(...xs);
+                const minY = Math.min(...ys);
+                const maxY = Math.max(...ys);
+                
+                const width = maxX - minX;
+                const height = maxY - minY;
+                
+                // マージンを追加
+                const margin = 30;
+                const cropX = Math.max(0, minX - margin);
+                const cropY = Math.max(0, minY - margin);
+                const cropWidth = Math.min(sourceCanvas.width - cropX, width + margin * 2);
+                const cropHeight = Math.min(sourceCanvas.height - cropY, height + margin * 2);
+
+                // バーコード表示用キャンバスを取得
+                const barcodeCanvas = document.getElementById('barcodeCanvas');
+                const ctx = barcodeCanvas.getContext('2d');
+                
+                // キャンバスサイズを設定
+                barcodeCanvas.width = cropWidth;
+                barcodeCanvas.height = cropHeight;
+                
+                // バーコード領域を切り出し
+                ctx.drawImage(sourceCanvas, 
+                    cropX, cropY, cropWidth, cropHeight,
+                    0, 0, cropWidth, cropHeight
+                );
+                
+                // 検出枠を描画
+                ctx.strokeStyle = '#00ff00';
+                ctx.lineWidth = 3;
+                ctx.strokeRect(minX - cropX, minY - cropY, width, height);
+                
+                console.log('バーコード領域を表示:', {
+                    code: code,
+                    points: resultPoints.length,
+                    crop: { x: cropX, y: cropY, width: cropWidth, height: cropHeight }
+                });
+            } else {
+                // 結果点がない場合は全体を表示
+                const barcodeCanvas = document.getElementById('barcodeCanvas');
+                const ctx = barcodeCanvas.getContext('2d');
+                
+                barcodeCanvas.width = sourceCanvas.width;
+                barcodeCanvas.height = sourceCanvas.height;
+                ctx.drawImage(sourceCanvas, 0, 0);
+                
+                console.log('バーコード全体を表示 (結果点なし)');
             }
-
-            // バーコード領域の境界を計算
-            const minX = Math.min(...box.map(p => p[0]));
-            const maxX = Math.max(...box.map(p => p[0]));
-            const minY = Math.min(...box.map(p => p[1]));
-            const maxY = Math.max(...box.map(p => p[1]));
-            
-            const width = maxX - minX;
-            const height = maxY - minY;
-            
-            // マージンを追加
-            const margin = 20;
-            const cropX = Math.max(0, minX - margin);
-            const cropY = Math.max(0, minY - margin);
-            const cropWidth = Math.min(sourceCanvas.width - cropX, width + margin * 2);
-            const cropHeight = Math.min(sourceCanvas.height - cropY, height + margin * 2);
-
-            // バーコード表示用キャンバスを取得
-            const barcodeCanvas = document.getElementById('barcodeCanvas');
-            const ctx = barcodeCanvas.getContext('2d');
-            
-            // キャンバスサイズを設定
-            barcodeCanvas.width = cropWidth;
-            barcodeCanvas.height = cropHeight;
-            
-            // バーコード領域を切り出し
-            ctx.drawImage(sourceCanvas, 
-                cropX, cropY, cropWidth, cropHeight,  // source
-                0, 0, cropWidth, cropHeight           // destination
-            );
-            
-            // 検出枠を描画
-            ctx.strokeStyle = '#00ff00';
-            ctx.lineWidth = 2;
-            ctx.strokeRect(minX - cropX, minY - cropY, width, height);
             
             // 情報を表示
-            document.getElementById('detectedCode').textContent = codeResult.code;
-            document.getElementById('detectedISBN').textContent = this.extractISBN(codeResult.code) || 'なし';
-            document.getElementById('confidence').textContent = 
-                codeResult.decodedCodes ? 
-                `${Math.round(codeResult.decodedCodes.reduce((sum, code) => sum + (code.error || 0), 0) / codeResult.decodedCodes.length * 100)}%` : 
-                '不明';
+            document.getElementById('detectedCode').textContent = code;
+            document.getElementById('detectedISBN').textContent = this.extractISBN(code) || 'なし';
+            document.getElementById('confidence').textContent = '成功';
             
             // 検出結果エリアを表示
             document.getElementById('barcodeDetection').style.display = 'block';
-            
-            console.log('バーコード領域を表示しました:', {
-                code: codeResult.code,
-                box: box,
-                crop: { x: cropX, y: cropY, width: cropWidth, height: cropHeight }
-            });
             
         } catch (error) {
             console.warn('バーコード領域の表示に失敗:', error);
@@ -245,41 +150,20 @@ export class BarcodeScanner {
         document.getElementById('barcodeDetection').style.display = 'none';
     }
 
-    stopScanning() {
-        this.isScanning = false;
-        
-        try {
-            // QuaggaJSを停止
-            Quagga.stop();
-            console.log('QuaggaJS scanning stopped');
-        } catch (error) {
-            console.warn('Error stopping scanner:', error);
-        }
-
-        // ビデオストリームをクリーンアップ
-        const videoElement = document.getElementById('video');
-        if (videoElement.srcObject) {
-            videoElement.srcObject = null;
-        }
-    }
-
     extractISBN(text) {
-        // ISBNの抽出と検証
-        // ハイフンを除去
         const cleaned = text.replace(/[-\s]/g, '');
         
-        // ISBN-13 (978 または 979 で始まる13桁)
+        // ISBN-13
         if (/^97[89]\d{10}$/.test(cleaned)) {
             return cleaned;
         }
         
-        // ISBN-10 (10桁、最後の文字はXの可能性あり)
+        // ISBN-10
         if (/^\d{9}[\dX]$/.test(cleaned)) {
-            // ISBN-10をISBN-13に変換
             return this.convertISBN10to13(cleaned);
         }
         
-        // EAN-13コードの場合もISBNとして処理
+        // EAN-13
         if (/^\d{13}$/.test(cleaned) && (cleaned.startsWith('978') || cleaned.startsWith('979'))) {
             return cleaned;
         }
@@ -288,11 +172,9 @@ export class BarcodeScanner {
     }
 
     convertISBN10to13(isbn10) {
-        // ISBN-10をISBN-13に変換
-        const isbn10_digits = isbn10.slice(0, 9); // チェックディジットを除く9桁
+        const isbn10_digits = isbn10.slice(0, 9);
         const isbn13_prefix = '978' + isbn10_digits;
         
-        // ISBN-13のチェックディジットを計算
         let sum = 0;
         for (let i = 0; i < 12; i++) {
             const digit = parseInt(isbn13_prefix[i]);

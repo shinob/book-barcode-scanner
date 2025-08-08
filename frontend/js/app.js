@@ -19,10 +19,6 @@ class BookBarcodeApp {
     }
 
     setupEventListeners() {
-        // スキャンボタン
-        document.getElementById('startScanBtn').addEventListener('click', () => this.startScanning());
-        document.getElementById('stopScanBtn').addEventListener('click', () => this.stopScanning());
-        
         // 画像アップロード
         document.getElementById('imageUpload').addEventListener('change', (e) => this.handleImageUpload(e));
         
@@ -45,28 +41,6 @@ class BookBarcodeApp {
         document.getElementById('manualIsbn').addEventListener('keypress', (e) => {
             if (e.key === 'Enter') this.searchManualISBN();
         });
-
-        // スキャン結果のイベントリスナー
-        this.scanner.onScanSuccess = (isbn) => this.handleScanSuccess(isbn);
-        this.scanner.onScanError = (error) => this.handleScanError(error);
-    }
-
-    async startScanning() {
-        try {
-            await this.scanner.startScanning();
-            document.getElementById('startScanBtn').style.display = 'none';
-            document.getElementById('stopScanBtn').style.display = 'inline-block';
-            this.showScanResult('カメラが起動しました。バーコードをカメラに向けてください。', 'success');
-        } catch (error) {
-            this.showScanResult(`カメラの起動に失敗しました: ${error.message}`, 'error');
-        }
-    }
-
-    stopScanning() {
-        this.scanner.stopScanning();
-        document.getElementById('startScanBtn').style.display = 'inline-block';
-        document.getElementById('stopScanBtn').style.display = 'none';
-        this.showScanResult('スキャンを停止しました。', 'success');
     }
 
     async handleImageUpload(event) {
@@ -104,21 +78,6 @@ class BookBarcodeApp {
         }
     }
 
-    async handleScanSuccess(isbn) {
-        // 重複チェック
-        if (this.books.some(book => book.isbn === isbn)) {
-            this.showScanResult(`ISBN: ${isbn} は既に追加されています。`, 'error');
-            return;
-        }
-
-        this.showScanResult(`ISBN: ${isbn} が検出されました。書籍情報を取得中...`, 'success');
-        await this.searchBookByISBN(isbn);
-    }
-
-    handleScanError(error) {
-        console.warn('Scan error:', error);
-        // ユーザーには詳細なエラーを表示しない（スキャンは連続的に行われるため）
-    }
 
     async searchBookByISBN(isbn) {
         this.showLoading(true);

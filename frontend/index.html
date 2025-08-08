@@ -17,16 +17,13 @@
             <section class="scanner-section">
                 <h2>バーコードスキャン</h2>
                 <div class="scanner-container">
-                    <video id="video" autoplay muted playsinline></video>
                     <canvas id="canvas" style="display: none;"></canvas>
                 </div>
                 <div class="scanner-controls">
-                    <button id="startScanBtn" class="btn btn-primary">スキャン開始</button>
-                    <button id="stopScanBtn" class="btn btn-secondary" style="display: none;">スキャン停止</button>
-                    <label for="imageUpload" class="btn btn-success">画像アップロード</label>
+                    <label for="imageUpload" class="btn btn-primary">画像アップロード</label>
                     <input type="file" id="imageUpload" accept="image/*" style="display: none;">
                     <button id="manualInputBtn" class="btn btn-outline">手動入力</button>
-                </div>
+                </div></div>
                 <div id="scanResult" class="scan-result"></div>
                 
                 <!-- バーコード検出結果表示 -->
@@ -76,8 +73,8 @@
         </div>
     </div>
 
-    <!-- QuaggaJS CDN - 安定版 -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js"></script>
+    <!-- ZXing-js CDN -->
+    <script src="https://unpkg.com/@zxing/library@latest/umd/index.min.js"></script>
     <!-- SheetJS CDN for Excel export -->
     <script src="https://unpkg.com/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     
