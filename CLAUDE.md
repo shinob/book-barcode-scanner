@@ -70,7 +70,7 @@ This is a **book barcode scanner web application** with a clear separation betwe
 
 **Frontend (Vanilla JavaScript + ES6 Modules):**
 - `app.js` - Main application controller, manages state and UI
-- `scanner.js` - Camera-based barcode scanning using ZXing-js
+- `scanner.js` - Image-based barcode scanning using ZXing-js
 - `bookApi.js` - API communication layer (Google Books API + backend)
 - `export.js` - Data export functionality (Excel/CSV using SheetJS)
 
@@ -84,8 +84,8 @@ This is a **book barcode scanner web application** with a clear separation betwe
 - ES6 modules with explicit imports/exports
 - Class-based components with clear separation of concerns
 - LocalStorage for client-side data persistence
-- Event-driven architecture with callback handling
-- Responsive design with mobile camera support
+- Event-driven architecture with file upload handling
+- Responsive design with image upload support
 
 **Backend Architecture:**
 - FastAPI with async/await patterns
@@ -100,12 +100,13 @@ This is a **book barcode scanner web application** with a clear separation betwe
 - RESTful endpoints with proper HTTP status codes
 
 ### Data Flow
-1. User scans barcode or manually inputs ISBN
-2. Frontend validates ISBN format and checks for duplicates
-3. Google Books API fetched for book metadata
-4. Backend API called for Amazon pricing (if available)
-5. Book data stored in LocalStorage and displayed in UI
-6. Export functionality allows CSV/Excel download
+1. User uploads image containing barcode or manually inputs ISBN
+2. ZXing-js library processes uploaded image to extract barcode data
+3. Frontend validates ISBN format and checks for duplicates
+4. Google Books API fetched for book metadata
+5. Backend API called for Amazon pricing (if available)
+6. Book data stored in LocalStorage and displayed in UI
+7. Export functionality allows CSV/Excel download
 
 ## Environment Configuration
 
@@ -154,9 +155,11 @@ The Makefile uses `bash -c` commands to ensure compatibility across different sh
 ### Important Implementation Details
 
 **Barcode Scanning:**
-- Requires HTTPS for camera access in browsers
-- Uses ZXing-js library for ISBN barcode detection
+- Image upload-based scanning (no camera access required)
+- Uses ZXing-js library for ISBN barcode detection from uploaded images
 - Supports both ISBN-10 and ISBN-13 formats
+- Displays detected barcode regions with visual feedback
+- Canvas-based image processing for barcode extraction
 
 **Amazon Price Scraping:**
 - Uses web scraping (not official API) - be mindful of rate limits
@@ -173,4 +176,5 @@ The Makefile uses `bash -c` commands to ensure compatibility across different sh
 - Image lazy loading for book thumbnails
 - Rate limiting on Amazon price requests
 - Client-side data validation before API calls
-- Responsive design optimized for mobile scanning
+- Efficient image processing with Canvas API
+- Responsive design optimized for image upload on mobile devices
